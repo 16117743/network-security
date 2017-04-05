@@ -42,6 +42,12 @@ network 136.201.10.0 area 0
 network 136.201.100.0 area 0
 
 
+*************************************** 
+* configuring North-IN ACL:
+*************************************** 
+ip access-list extended North-IN
+deny ip 66.60.0.0 0.0.255.255 any  
+permit ospf any any 				//EvilGroup are denied access to any machine in the corporate network
 
 
 
