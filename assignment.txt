@@ -6,8 +6,8 @@
 interface GigabitEthernet0/0
 description NORTH_SEG
 ip address 10.10.10.10 255.255.255.0 		//assign ip address to the GigabitEthernet0/0
-ip access-group External-IN in
-ip access-group External-OUT out
+ip access-group North-IN in
+ip access-group North-OUT out
 duplex auto
 
 interface FastEthernet3/0
@@ -28,5 +28,25 @@ ip address 136.201.100.1 255.255.255.0 		//assign ip address to the FastEthernet
 ip access-group East-IN in
 ip access-group East-OUT out
 duplex auto
+
+*************************************** 
+* configuring OSPF Router protocol:
+*************************************** 
+
+router ospf 1
+
+network 10.10.10.0 area 1
+
+network 136.201.5.0 area 0 
+network 136.201.10.0 area 0
+network 136.201.100.0 area 0
+
+
+
+
+
+
+
+
 
 
