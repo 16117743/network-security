@@ -48,9 +48,13 @@ network 136.201.100.0 area 0
 ip access-list extended North-IN
 deny ip 66.60.0.0 0.0.255.255 any  
 permit ospf any any 				//EvilGroup are denied access to any machine in the corporate network
+permit tcp any host 136.201.5.30 eq 25  	//Any outside machine can access Mail Relay server 136.201.65.30 via SMTP
 
+permit tcp any eq 25 host 136.201.5.30		//relay mail server can access any (outside) machine via SMTP
 
-
+permit tcp any gt 1023 host 136.201.5.20 eq 80 reflect WEB_ALL_80 	//Everybody can access the Web server
+permit tcp any host 136.201.5.10 eq 433 reflect NNTP_433		//Any outside machine can access the NNTP server on port 443
+permit tcp any host 136.201.5.10 eq 119 reflect NNTP_119		//Any outside machine can access the NNTP server on port 119
 
 
 
