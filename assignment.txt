@@ -4,67 +4,104 @@
 *************************************** 
 
 interface GigabitEthernet0/0
-description NORTH_SEG
+no shutdown					//enable interface
+description NORTH_SEG				//name the interface NORTH_SEG
 ip address 10.10.10.10 255.255.255.0 		//assign ip address to the GigabitEthernet0/0
-ip access-group North-IN in
-ip access-group North-OUT out
-duplex auto
+ip access-group North-IN in			//apply ACL to interface
+ip access-group North-OUT out			//apply ACL to interface
+duplex auto					//interface automatically operates at half or full duplex
+
 
 interface FastEthernet3/0
-description SOUTH_SEG
+no shutdown					//enable interface
+description SOUTH_SEG				//name the interface SOUTH_SEG
 ip address 136.201.10.100 255.255.255.0 	//assign ip address to the FastEthernet3/0
-ip access-group South-IN in
-ip access-group South-OUT out
-duplex auto
+ip access-group South-IN in			//apply ACL to interface
+ip access-group South-OUT out			//apply ACL to interface
+duplex auto					//interface automatically operates at half or full duplex
+
 
 interface FastEthernet1/0
-description WEST_SEG  				//name the interface PUBLIC_SEG
+no shutdown					//enable interface
+description WEST_SEG  				//name the interface WEST_SEG
 ip address 136.201.5.100 255.255.255.0 		//assign ip address to the FastEthernet1/0
-duplex auto
+duplex auto					//interface automatically operates at half or full duplex
+
 
 interface FastEthernet2/0
-description EAST_SEG
+no shutdown					//enable interface
+description EAST_SEG				//name the interface EAST_SEG
 ip address 136.201.100.1 255.255.255.0 		//assign ip address to the FastEthernet2/0
-ip access-group East-IN in
-ip access-group East-OUT out
-duplex auto
+ip access-group East-IN in			//apply ACL to interface
+ip access-group East-OUT out			//apply ACL to interface
+duplex auto					//interface automatically operates at half or full duplex
+
 
 *************************************** 
 * configuring OSPF Router protocol:
 *************************************** 
 
-router ospf 1
-
-network 10.10.10.0 area 1
-
-network 136.201.5.0 area 0 
-network 136.201.10.0 area 0
-network 136.201.100.0 area 0
+router ospf 1					//configure router to use ospf
+network 10.10.10.0 area 1			//define external area
+network 136.201.5.0 area 0 			//define internal area (public network)
+network 136.201.10.0 area 0			//define internal area (server network)
+network 136.201.100.0 area 0			//define internal area (workstations)
 
 
 *************************************** 
 * configuring North-IN ACL:
 *************************************** 
 ip access-list extended North-IN
+
 deny ip 66.60.0.0 0.0.255.255 any  		//EvilGroup are denied access to any machine in the corporate network
 permit ospf any any 				//permit ospf traffic
 permit tcp any host 136.201.5.30 eq 25  	//Any outside machine can access Mail Relay server 136.201.65.30 via SMTP
-
 permit tcp any eq 25 host 136.201.5.30		//relay mail server can access any (outside) machine via SMTP
-
 permit tcp any gt 1023 host 136.201.5.20 eq 80 reflect WEB_ALL_80 	//Everybody can access the Web server
 permit tcp any host 136.201.5.10 eq 433 reflect NNTP_433		//Any outside machine can access the NNTP server on port 443
 permit tcp any host 136.201.5.10 eq 119 reflect NNTP_119		//Any outside machine can access the NNTP server on port 119
 
+
 *************************************** 
 * configuring North-OUT ACL:
 *************************************** 
-permit ospf any any 
-permit tcp host 136.201.5.30 any eq 25		//Any outside machine can access Mail Relay server via SMTP
+
+ip access-list extended North-OUT
+
+permit ospf any any 				//allow ospf traffic
+permit tcp host 136.201.5.30 any eq 25		//Any outside machine can access Mail Relay server on port 25
 permit tcp host 136.201.5.30 eq 25 any  	//Relay Mail server can access any (outside) machine via SMTP
-evaluate NNTP_433
-evaluate NNTP_119
-evaluate WEB_ALL_80
+evaluate NNTP_433				//Any outside machine can access the NNTP server on port 443
+evaluate NNTP_119				//Any outside machine can access the NNTP server on port 119
+evaluate WEB_ALL_80				//Everybody can access the Web server
 
 
+*************************************** 
+* configuring South-IN ACL:
+***************************************
+
+ip access-list extended South-IN
+
+permit tcp any gt 1023 host 136.201.5.20 eq 80 reflect WEB_ALL_80 	//Everybody can access the Web server at port 80 
+permit tcp host 136.201.10.20 eq 25 host 136.201.5.30			//Mail server can access Relay Mail server via SMTP
+permit tcp host 136.201.10.20 eq 143 136.201.100.0 0.0.0.255	        //only machines in the WS subnet can access Mail Server via IMAP
+permit tcp host 136.201.10.20 host 136.201.5.30 eq 25			//Mail server can access Relay Mail server on port 25
+evaluate NNTP_433						//Any outside machine can access the NNTP server on port 443
+evaluate SQL_1433						//DataBase Server can only be accessed by Web server
+
+
+*************************************** 
+* configuring South-OUT ACL:
+***************************************
+
+ip access-list extended South-OUT
+
+deny tcp host 136.201.5.10 host 136.201.10.30 eq 1433		//DataBase Server can only be accessed by Web server
+deny tcp host 136.201.5.30 host 136.201.10.30 eq 1433		//DataBase Server can only be accessed by Web server
+permit tcp any host 136.201.10.30 eq 1433 reflect SQL_1433	//DataBase Server can only be accessed by Web server
+permit tcp host 136.201.5.10 eq 433 any reflect NNTP_433	//Any outside machine can access the NNTP server on port 443
+permit tcp host 136.201.5.30 host 136.201.10.20 eq 25		//Mail server can access Relay Mail server on port 25
+permit tcp host 136.201.5.30 eq 25 host 136.201.10.20		//Mail server can access Relay Mail server via SMTP
+permit tcp 136.201.100.0 0.0.0.255 host 136.201.10.20 eq 143	//Only machines in the WS subnet can access Mail Server via IMAP
+evaluate WEB_ALL_80						//Everybody can access the Web server at port 80
 
