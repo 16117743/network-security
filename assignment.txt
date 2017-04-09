@@ -1,9 +1,13 @@
+Name:		Thomas Flynn
+ID:		16117743
+Github link:    https://github.com/16117743/network-security/blob/master/assignment.txt
+
 
 *************************************** 
 * configuring Border Router interfaces:
 *************************************** 
 
-interface GigabitEthernet0/0
+interface GigabitEthernet0/0			//north interface = internet 
 no shutdown					//enable interface
 description NORTH_SEG				//name the interface NORTH_SEG
 ip address 10.10.10.10 255.255.255.0 		//assign ip address to the GigabitEthernet0/0
@@ -12,7 +16,7 @@ ip access-group North-OUT out			//apply ACL to interface
 duplex auto					//interface automatically operates at half or full duplex
 
 
-interface FastEthernet3/0
+interface FastEthernet3/0			//south interface = server network
 no shutdown					//enable interface
 description SOUTH_SEG				//name the interface SOUTH_SEG
 ip address 136.201.10.100 255.255.255.0 	//assign ip address to the FastEthernet3/0
@@ -21,14 +25,14 @@ ip access-group South-OUT out			//apply ACL to interface
 duplex auto					//interface automatically operates at half or full duplex
 
 
-interface FastEthernet1/0
+interface FastEthernet1/0			//west interface = public network 
 no shutdown					//enable interface
 description WEST_SEG  				//name the interface WEST_SEG
 ip address 136.201.5.100 255.255.255.0 		//assign ip address to the FastEthernet1/0
 duplex auto					//interface automatically operates at half or full duplex
 
 
-interface FastEthernet2/0
+interface FastEthernet2/0			//east interface = workstation network
 no shutdown					//enable interface
 description EAST_SEG				//name the interface EAST_SEG
 ip address 136.201.100.1 255.255.255.0 		//assign ip address to the FastEthernet2/0
@@ -51,7 +55,7 @@ network 136.201.100.0 area 0			//define internal area (workstations)
 *************************************** 
 * configuring North-IN ACL:
 *************************************** 
-ip access-list extended North-IN
+ip access-list extended North-IN		//create named extended ACL
 
 deny ip 66.60.0.0 0.0.255.255 any  		//EvilGroup are denied access to any machine in the corporate network
 permit ospf any any 				//permit ospf traffic
@@ -66,10 +70,9 @@ permit tcp any host 136.201.5.10 eq 119 reflect NNTP_119		//Any outside machine 
 * configuring North-OUT ACL:
 *************************************** 
 
-ip access-list extended North-OUT
+ip access-list extended North-OUT		//create named extended ACL
 
 permit ospf any any 				//allow ospf traffic
-permit tcp host 136.201.5.30 any eq 25		//Any outside machine can access Mail Relay server on port 25
 permit tcp host 136.201.5.30 eq 25 any  	//Relay Mail server can access any (outside) machine via SMTP
 evaluate NNTP_433				//Any outside machine can access the NNTP server on port 443
 evaluate NNTP_119				//Any outside machine can access the NNTP server on port 119
@@ -80,7 +83,7 @@ evaluate WEB_ALL_80				//Everybody can access the Web server
 * configuring South-IN ACL:
 ***************************************
 
-ip access-list extended South-IN
+ip access-list extended South-IN					//create named extended ACL
 
 permit tcp any gt 1023 host 136.201.5.20 eq 80 reflect WEB_ALL_80 	//Everybody can access the Web server at port 80 
 permit tcp host 136.201.10.20 eq 25 host 136.201.5.30			//Mail server can access Relay Mail server via SMTP
@@ -88,13 +91,14 @@ permit tcp host 136.201.10.20 eq 143 136.201.100.0 0.0.0.255	        //only mach
 permit tcp host 136.201.10.20 host 136.201.5.30 eq 25			//Mail server can access Relay Mail server on port 25
 evaluate NNTP_433						//Any outside machine can access the NNTP server on port 443
 evaluate SQL_1433						//DataBase Server can only be accessed by Web server
+evaluate ICMP							//ICMP policy for WS to communicate with server network
 
 
 *************************************** 
 * configuring South-OUT ACL:
 ***************************************
 
-ip access-list extended South-OUT
+ip access-list extended South-OUT				//create named extended ACL
 
 deny tcp host 136.201.5.10 host 136.201.10.30 eq 1433		//DataBase Server can only be accessed by Web server
 deny tcp host 136.201.5.30 host 136.201.10.30 eq 1433		//DataBase Server can only be accessed by Web server
@@ -104,4 +108,135 @@ permit tcp host 136.201.5.30 host 136.201.10.20 eq 25		//Mail server can access 
 permit tcp host 136.201.5.30 eq 25 host 136.201.10.20		//Mail server can access Relay Mail server via SMTP
 permit tcp 136.201.100.0 0.0.0.255 host 136.201.10.20 eq 143	//Only machines in the WS subnet can access Mail Server via IMAP
 evaluate WEB_ALL_80						//Everybody can access the Web server at port 80
+permit icmp any 136.201.10.0 0.0.0.255 reflect ICMP		//ICMP policy for WS to communicate with server network
+
+
+*************************************** 
+* configuring East-IN ACL:
+***************************************
+
+ip access-list extended East-IN					//create named extended ACL
+
+permit udp any host 20.1.1.1 eq 53 reflect DNS_UDP		//WS can access the business partner’s DNS server for DNS queries (UDP)
+permit tcp any host 20.1.1.1 eq 53 reflect DNS_TCP		//WS can access the business partner’s DNS server for DNS queries (TCP)
+permit tcp any host 136.201.10.20 eq 25 reflect SMTP_25    	//can access the mail server for SMTP
+permit tcp any host 136.201.10.20 eq 143 reflect IMAP_143	//can access the mail server for IMAP
+permit tcp any host 136.201.5.10 eq 119 reflect NNTP_119	//can access NNTP server on port TCP/119
+permit tcp any host 136.201.10.30 eq 1433 relect SQL_1433	//can access DB server for SQL queries (TCP/1433)
+permit tcp any host 136.201.5.20 eq 443 reflect WEB_443		//access Any web server on ports TCP/80, TCP/8080 and TCP/443
+permit tcp any host 136.201.5.20 eq 8080 reflect WEB_8080	//access Any web server on ports TCP/80, TCP/8080 and TCP/443
+permit tcp any gt 1023 host 136.201.5.20 eq 80 reflect WEB_ALL_80 	//access Any web server on ports TCP/80, TCP/8080 and TCP/443
+evaluate NNTP_433						//Any outside machine can access the NNTP server on port TCP/433
+permit icmp any 136.201.10.0 0.0.0.255 reflect ICMP		//ICMP policy for WS to communicate with server network
+
+
+
+*************************************** 
+* configuring East-OUT ACL:
+***************************************
+
+ip access-list extended East-OUT				//create named extended ACL
+
+permit tcp host 136.201.5.10 eq 433 any reflect NNTP_433  	//Any outside machine can access the NNTP server on port TCP/433
+evaluate SQL_1433						//can access DB server for SQL queries (TCP/1433)
+evaluate IMAP_143						//can access the mail server for IMAP
+evaluate SMTP_25						//can access the mail server for SMTP
+evaluate DNS_UDP						//WS can access the business partner’s DNS server for DNS queries (UDP)
+evaluate DNS_TCP						//WS can access the business partner’s DNS server for DNS queries (TCP)
+evaluate WEB_8080						//access Any web server on ports TCP/80, TCP/8080 and TCP/443
+evaluate WEB_443						//access Any web server on ports TCP/80, TCP/8080 and TCP/443
+evaluate WEB_ALL_80						//access Any web server on ports TCP/80, TCP/8080 and TCP/443
+evaluate ICMP							//ICMP policy for WS to communicate with server network
+
+
+***************************************************************
+* Security Policy Description:				      *
+***************************************************************
+1.) All devices from EvilGroup are denied access to any machine in the corporate network
+
+	Configured on the inbound direction of the north interface
+
+
+2.) Any outside machine can access Mail Relay server 136.201.5.30 via SMTP (on port TCP/25).
+
+	Configured on both the inbound and outbound direction of the north interface
+
+
+3.) Relay Mail server 136.201.5.30 can access any (outside) machine and Mail Server (136.201.10.20) via SMTP (port TCP/25).
+
+	Configured ACLs on both the north and south interfaces for both the inbound and outbound directions
+
+
+4.) Everybody can access the Web server 136.201.5.20 at port TCP/80 – make sure the client cannot use any server port (1-1023)
+
+	Configured Reflective ACLs on interfaces (North, South and East) on both inbound and outbound direction
+
+
+5.) Any outside machine can access the NNTP (Network News) server 136.201.5.10 on ports TCP/119 and TCP/433.
+
+	Configured Reflective ACLs on the North interface for both inbound and outbound directions
+
+
+6.) NNTP server 136.201.5.10 can only initiate connections to other machine on port TCP/433.
+
+	Configured Reflective ACLs on the outbound north and south interfaces
+
+
+7.) Web server can only initiate connections to the DataBase Server (136.201.10.30:1433). All other traffic from the web server must be return traffic to previous requests
+
+	Configured Reflective ACL on the south interface outbound direction
+
+
+8.) Only machines in the workstation subnet can access Mail Server via IMAP (on port TCP/143).
+
+	Configured ACL on the inbound and outbound direction on the south interface
+
+9.) Mail server (136.201.10.20) can access Relay Mail server via SMTP (port TCP/25)
+
+	Configured ACL on the outbound and inbound direction on the server segment
+
+
+10.) DataBase Server (136.201.10.30) can only be accessed by Web server (136.201.5.20), your own workstations (136.201.100.0/24) and your business partner (20.0.0.0/8) using SQL queries (TCP/1433). It can only react to incoming requests and is not allowed to initiate any connections
+
+	Configured 2 deny ACLs on the outbound interface in the south interface. 
+	This prevents Relay Mail server and NNTP access to Database server.
+	A permit any ACL is configured on the outbound direction of the south interface. 
+	This allows the rest of the devices to communicate to Database server
+
+
+11.) Workstations (136.201.100.0/24) can access:
+	o Any web server on ports TCP/80, TCP/8080 and TCP/443.
+	o Your own DataBase server (136.201.10.30) for SQL queries (TCP/1433).
+	o Only the business partner’s DNS server 20.1.1.1 for DNS queries (TCP/53 andUDP/53)
+	o Mail server (136.201.10.20) for IMAP and SMTP.
+	o NNTP (136.201.5.10) server on port TCP/119
+
+
+	Configured Reflective ACL on both the inbound and outbound direction on the east interface.
+
+***************************************************************
+* ICMP Policy Description:				      *
+***************************************************************
+The ICMP policy is configured for the Workstation and server network to communicate to each other excluding all other entities. 
+Reflexive ACL was used to to configure the policy so that only the requested ICMP packets will get a response.
+This policy is somewhat restricted for a network engineer to go about trouble shooting the network. The policy should be expanded so that the Partner and the corporate network can communicate. The justification for the applied policy is that only users of the workstation should be able to diagnose problems encountered in the server network. 
+
+
+***************************************************************
+* Routing Protocol Description:				      *
+***************************************************************
+- Open Shortest Path First (OSPF) is a routing protocol for Internet Protocol (IP) networks. 
+- It uses a link state routing (LSR) algorithm and falls into the group of interior gateway protocols (IGPs), operating within a single autonomous system (AS).
+- OSPF is on of the most widely used IGP in large enterprise networks.
+- OSPF detects changes in the topology, such as link failures, and converges on a new loop-free routing structure within seconds.
+- An OSPF network may be structured, or subdivided, into routing areas to simplify administration and optimize traffic and resource utilization.
+
+OSPF was chosen in order to be able to subdivide routing areas in order to simplify adminstration and resource utilization.
+
+"permit ospf any any" is the policy which is applied on both the outbound and inbound directions of the north interface which connects to the internet for OSPF to run across the layer 3 network.
+
+
+
+
+
 
